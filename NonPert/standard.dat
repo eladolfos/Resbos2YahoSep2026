@@ -1,0 +1,16 @@
+# Configuration file for the default model parameters, 
+# and the selection of Electroweak schemes to be used.
+
+# Boson Masses
+mz = 91.1876
+mw = 80.385
+mh = 125
+ma = 0
+
+# Quark Masses
+mu = 0
+md = 0
+ms = 0
+mc = 1.3
+mb = 4.75
+mt = 173.5
