@@ -1,6 +1,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <memory>
 
@@ -33,6 +35,20 @@
 
 // Store information about the ThreadPool
 ThreadPool *pool;
+
+namespace {
+    // Create the given directory if it doesn't already exist, so grid cache files can be
+    // written/read regardless of which directory `resbos` is run from.
+    void EnsureDirectoryExists(const std::string &dir) {
+        struct stat st{};
+        if(stat(dir.c_str(), &st) == -1) {
+            if(mkdir(dir.c_str(), 0700) != 0 && errno != EEXIST) {
+                throw std::runtime_error("Unable to create directory '" + dir
+                        + "' needed to store grid files: " + std::strerror(errno));
+            }
+        }
+    }
+}
 
 namespace Beam {
     // Convolution class constructor
@@ -1111,16 +1127,21 @@ namespace Beam {
         // Create unique filename
         std::string filename = pdfName + "_" + std::to_string(iset) + "_Conv_" + gridString + ".out";
 
+        // Make sure the ConvGrids directory exists before trying to write into it
+        EnsureDirectoryExists("ConvGrids");
+
 #ifdef HAVE_GZIP
+        std::string path = "ConvGrids/" + filename + ".gz";
         // Open output file
-        ogzstream gridOut(("ConvGrids/" + filename + ".gz").c_str());
+        ogzstream gridOut(path.c_str());
 #else
+        std::string path = "ConvGrids/" + filename;
         // Open output file
-        std::ofstream gridOut("ConvGrids/" + filename);
+        std::ofstream gridOut(path);
 #endif
         // Check to ensure the file opens correctly
         if(!gridOut.is_open()) {
-            throw std::runtime_error("Unable to open file: " + filename);
+            throw std::runtime_error("Unable to open file for writing: " + path);
         }
 
         // Write metadata

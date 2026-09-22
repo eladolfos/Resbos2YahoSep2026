@@ -1,4 +1,8 @@
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <cerrno>
 #include <cmath>
+#include <cstring>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -33,6 +37,20 @@ struct Point {
 #endif
 
 //#include "ResBos/PeakFinder.hh"
+
+namespace {
+    // Create the given directory if it doesn't already exist, so grid cache files can be
+    // written/read regardless of which directory `resbos` is run from.
+    void EnsureDirectoryExists(const std::string &dir) {
+        struct stat st{};
+        if(stat(dir.c_str(), &st) == -1) {
+            if(mkdir(dir.c_str(), 0700) != 0 && errno != EEXIST) {
+                throw std::runtime_error("Unable to create directory '" + dir
+                        + "' needed to store grid files: " + std::strerror(errno));
+            }
+        }
+    }
+}
 
 namespace ResBos {
     using namespace QCD;
@@ -361,8 +379,11 @@ namespace ResBos {
         std::string pdf = pdfName + "_" + std::to_string(iset);
         double ecm = resbos -> GetECM();
 
+        // Make sure the Grids directory exists before trying to write into it
+        EnsureDirectoryExists("Grids");
+
         // Open up info file of all grids, and find the last used number
-        std::fstream gridKeys("Grids/gridlist.txt", 
+        std::fstream gridKeys("Grids/gridlist.txt",
                 std::ios::in | std::ios::out | std::ios::app);
         int gridFileNum = 0;
 
@@ -446,18 +467,20 @@ namespace ResBos {
 
         // Create file
 #ifdef HAVE_GZIP
-        std::string filename = "ResBos_GridFile_" 
-            + std::to_string(gridFileNum) + ".out.gz"; 
-        ogzstream gridOut(("Grids/" + filename).c_str());
+        std::string filename = "ResBos_GridFile_"
+            + std::to_string(gridFileNum) + ".out.gz";
+        std::string path = "Grids/" + filename;
+        ogzstream gridOut(path.c_str());
 #else
-        std::string filename = "ResBos_GridFile_" 
-            + std::to_string(gridFileNum) + ".out"; 
-        std::ofstream gridOut("Grids/" + filename);
+        std::string filename = "ResBos_GridFile_"
+            + std::to_string(gridFileNum) + ".out";
+        std::string path = "Grids/" + filename;
+        std::ofstream gridOut(path);
 #endif
-       
+
         // Ensure file opened
         if(!gridOut.is_open())
-            throw std::runtime_error("Unable to open grid file: " + filename);
+            throw std::runtime_error("Unable to open grid file for writing: " + path);
 
         // Write header of the file
         gridOut << std::setprecision(5) << std::fixed << std::left;
