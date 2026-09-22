@@ -107,7 +107,7 @@ function(add_mpi project_name)
             " (use -DUSE-MPI=OFF if you didn't want to build with MPI).")
     endif(NOT MPI_FOUND)
     add_definitions(-DUSING_MPI)
-    target_link_libraries(${project_name} INTERFACE MPI::MPI_C)
+    target_link_libraries(${project_name} INTERFACE MPI::MPI_CXX)
 endfunction()
 
 function(add_openmp project_name)

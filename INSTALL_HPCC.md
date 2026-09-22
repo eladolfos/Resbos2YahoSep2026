@@ -251,3 +251,39 @@ cmake .. \
 
 You should now see `CPM: adding package fmt@...` (a git clone/build) instead of
 `CPM: using local package fmt@...`, and the two errors above should be gone.
+
+### `The link interface of target "project_addons" contains: MPI::MPI_C but the target was not found`
+
+```
+CMake Error at CMake/ProgramOptions.cmake:110 (target_link_libraries):
+  The link interface of target "project_addons" contains:
+
+    MPI::MPI_C
+
+  but the target was not found.
+```
+
+**Cause**: this was a real bug in `CMake/ProgramOptions.cmake`'s `add_mpi()` function — it
+linked against `MPI::MPI_C`, but this project only enables the CXX language
+(`project(RESBOS CXX)` in the top-level `CMakeLists.txt`), so CMake's `FindMPI` only ever
+produces an `MPI::MPI_CXX` imported target here, never `MPI::MPI_C`. Your log confirms
+this: `Found MPI_CXX: .../libmpi.so`, with no `MPI_C` component probed at all.
+
+**Fix**: this has been corrected in the repo (`MPI::MPI_C` → `MPI::MPI_CXX`) — pull the
+latest before reconfiguring:
+
+```bash
+cd /mnt/home/lopezels/InstallSources/ResBos2Yaho
+git pull
+rm -rf build
+mkdir build && cd build
+cmake .. \
+    -DLHAPDF_ROOT_DIR=/mnt/home/lopezels/InstallSources/LHAPDF \
+    -DHoppet_ROOT_DIR=/mnt/home/lopezels/InstallSources/HOPPET1 \
+    -DUSE-ROOT=ON \
+    -DUSE-MPI=ON \
+    -DUSE-OPENMP=ON \
+    -DFITTING=OFF \
+    -DCPM_DOWNLOAD_ALL=ON \
+    -DCMAKE_INSTALL_PREFIX=/mnt/home/lopezels/InstallSources/ResBos2Yaho
+```
