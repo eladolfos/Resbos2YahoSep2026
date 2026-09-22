@@ -105,8 +105,15 @@ cmake .. \
     -DUSE-MPI=ON \
     -DUSE-OPENMP=ON \
     -DFITTING=OFF \
+    -DCPM_DOWNLOAD_ALL=ON \
     -DCMAKE_INSTALL_PREFIX=/mnt/home/lopezels/InstallSources/ResBos2Yaho
 ```
+
+`-DCPM_DOWNLOAD_ALL=ON` is required on this cluster: without it, CPM's `fmt` dependency
+(`external/CMakeLists.txt`) will pick up whatever system-wide `fmt` package your loaded
+modules expose via `find_package` (commonly leaked onto `CMAKE_PREFIX_PATH` by
+`thisroot.sh`) instead of building its own copy — see the **Troubleshooting** section
+below if you hit that.
 
 Watch the CMake output for `Looking for LHAPDF... found` / `Looking for Hoppet... found`
 / `Building with ROOT histograms` / `Building ResBos with MPI` / `...with OpenMP` — if any
@@ -195,3 +202,52 @@ If you end up needing `NonPertFit`/`GetFixed` after all, that requires installin
 (and Eigen3) on the HPCC, then reconfiguring with `-DFITTING=ON -DUSE-ROOT=ON` and setting
 `BAT_ROOT_DIR` (see `CMake/FindBAT.cmake` for the exact search variable) alongside the
 LHAPDF/Hoppet paths above — everything else in this document stays the same.
+
+## Troubleshooting
+
+### `add_library cannot create ALIAS target "fmt::fmt"` / `install TARGETS given target "fmt" which does not exist`
+
+```
+-- CPM: using local package fmt@12.0.0
+CMake Error at external/CMakeLists.txt:10 (add_library):
+  add_library cannot create ALIAS target "fmt::fmt" because target "fmt" does
+  not already exist.
+...
+CMake Error at src/CMakeLists.txt:44 (install):
+  install TARGETS given target "fmt" which does not exist.
+```
+
+**Cause**: `external/CMakeLists.txt` fetches `fmt` via CPM's `CPMFindPackage`, which
+*always* tries `find_package(fmt)` before building from source (this happens
+unconditionally, regardless of any `USE_LOCAL_PACKAGES`-style option — see
+`CMake/CPM.cmake`, the `cpm_find_package` call inside `CPMFindPackage`). On this HPCC
+node, sourcing `thisroot.sh` (for ROOT 6.30) adds ROOT's own CMake package directories to
+`CMAKE_PREFIX_PATH`, which exposes a system `fmt` package. CPM finds and uses that
+instead of building its own — but the project's own code right after
+(`add_library(fmt::fmt ALIAS fmt)`) assumes CPM built fmt from source, which creates a
+bare `fmt` target to alias. The system `fmt` package only exports the namespaced
+`fmt::fmt` target, so the alias (and later the `install(TARGETS ... fmt ...)` in
+`src/CMakeLists.txt`) fails.
+
+**Fix**: reconfigure with `-DCPM_DOWNLOAD_ALL=ON` (already included in step 3 above),
+which forces every CPM-managed dependency to build from source instead of accepting a
+system package. Since the failed configure already cached bad state, wipe the build
+directory first:
+
+```bash
+cd /mnt/home/lopezels/InstallSources/ResBos2Yaho
+rm -rf build
+mkdir build && cd build
+cmake .. \
+    -DLHAPDF_ROOT_DIR=/mnt/home/lopezels/InstallSources/LHAPDF \
+    -DHoppet_ROOT_DIR=/mnt/home/lopezels/InstallSources/HOPPET1 \
+    -DUSE-ROOT=ON \
+    -DUSE-MPI=ON \
+    -DUSE-OPENMP=ON \
+    -DFITTING=OFF \
+    -DCPM_DOWNLOAD_ALL=ON \
+    -DCMAKE_INSTALL_PREFIX=/mnt/home/lopezels/InstallSources/ResBos2Yaho
+```
+
+You should now see `CPM: adding package fmt@...` (a git clone/build) instead of
+`CPM: using local package fmt@...`, and the two errors above should be gone.
