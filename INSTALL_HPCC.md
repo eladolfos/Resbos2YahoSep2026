@@ -54,20 +54,38 @@ strings /mnt/home/lopezels/InstallSources/HOPPET1/lib/libhoppet_v1.a | grep -i "
 
 ## 2. Get the source onto the HPCC
 
-This local working copy (`Resbos2YahoSep2026`) is **not a git repository** — there's no
-`.git` here to push from. Get the code onto the HPCC by whichever of these applies:
-
-- If you have a git remote for this project, clone it directly on the HPCC into
-  `/mnt/home/lopezels/InstallSources/ResBos2Yaho`.
-- Otherwise, `rsync`/`scp` this directory to the HPCC:
+The code is now on GitHub at
+[eladolfos/Resbos2YahoSep2026](https://github.com/eladolfos/Resbos2YahoSep2026), so clone
+it directly on the HPCC rather than copying files over:
 
 ```bash
-rsync -avz --exclude build "Resbos2YahoSep2026/" \
-    lopezels@hpcc:/mnt/home/lopezels/InstallSources/ResBos2Yaho/
+mkdir -p /mnt/home/lopezels/InstallSources
+cd /mnt/home/lopezels/InstallSources
+git clone https://github.com/eladolfos/Resbos2YahoSep2026.git ResBos2Yaho
+cd ResBos2Yaho
 ```
 
-(`--exclude build` skips the machine-local build artifacts already in this working copy —
-you'll configure a fresh build directory on the HPCC.)
+HPCC login nodes normally have outbound internet, so this should work directly; if a
+particular node blocks it, run the clone from a node that does have access (the same one
+you'll use for the CPM fetch in the next step).
+
+If the repo is private, either clone over SSH instead (requires an SSH key added to your
+GitHub account):
+
+```bash
+git clone git@github.com:eladolfos/Resbos2YahoSep2026.git ResBos2Yaho
+```
+
+or authenticate over HTTPS with a GitHub personal access token when prompted for a
+password.
+
+To update later once you have changes on GitHub:
+
+```bash
+cd /mnt/home/lopezels/InstallSources/ResBos2Yaho
+git pull
+cd build && make -j8 && make -j8 install
+```
 
 ## 3. Configure
 
